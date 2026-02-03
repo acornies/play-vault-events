@@ -1,0 +1,8 @@
+[gd_scene format=3 uid="uid://cmmg4hhtauy3o"]
+
+[ext_resource type="Script" uid="uid://dhgaqxl6x04tm" path="res://main.gd" id="1_ig7tw"]
+
+[node name="Main" type="Node" unique_id=1536924981]
+script = ExtResource("1_ig7tw")
+websocket_url = "ws://localhost:8200/v1/sys/events/subscribe/kv-v2/data-*?json=true"
+auth_token = "root"

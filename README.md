@@ -132,6 +132,38 @@ vault policy list
 
 For a complete list of event types, refer to the [Vault Events Documentation](https://developer.hashicorp.com/vault/docs/concepts/events).
 
+## Godot WebSocket Client
+
+This repository includes a Godot Engine project (`godot/`) that demonstrates consuming Vault enterprise events through a WebSocket connection in real-time.
+
+### What it does
+
+The Godot project provides an interactive, visual way to monitor Vault events as they occur. The main script ([main.gd](godot/main.gd)) connects to Vault's WebSocket endpoint and displays incoming event notifications in the Godot console.
+
+Key features:
+- **Real-time event streaming**: Connects via WebSocket to `ws://localhost:8200` 
+- **Authentication**: Uses Vault token authentication via `X-Vault-Token` header
+- **Event display**: Prints all received Vault events to the Godot debug console
+- **Connection management**: Handles WebSocket connection states (connecting, open, closing, closed)
+
+### Running the Godot client
+
+1. **Install Godot Engine**: Download from [godotengine.org](https://godotengine.org/)
+
+2. **Set up Vault token**: In the Godot editor, select the main scene and set the `auth_token` export variable to your Vault token (default: `root`)
+
+3. **Run the project**: Press F5 in Godot or click the play button
+
+4. **Monitor events**: The Godot console will display incoming Vault events in real-time as you perform operations
+
+This provides an alternative to command-line tools like curl or websocat, especially useful for:
+- Visual debugging of event flows
+- Interactive demonstrations of Vault events
+- Game development scenarios where Vault events need to trigger in-game actions
+- Learning and experimenting with Vault's event streaming capabilities
+
+**Note**: The Godot client requires Vault to be running and accessible at `http://localhost:8200`.
+
 ## Stopping the Container
 
 To stop and remove the Vault container:
