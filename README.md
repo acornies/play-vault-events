@@ -1,6 +1,8 @@
 # play-vault-events
 
-This repository is for testing HashiCorp Vault Enterprise event notifications using Docker.
+This repository is for testing HashiCorp Vault event notifications using Docker.
+
+**Note**: Event notifications are available in Vault v1.21+ (both OSS and Enterprise editions). This setup uses the standard Vault image which includes event notification capabilities.
 
 ## Prerequisites
 
@@ -59,30 +61,28 @@ export VAULT_TOKEN='root'
 
 ## Subscribing to Vault Event Notifications
 
-Vault provides event notifications that allow you to subscribe to various system events. Here's how to work with them:
+Vault provides event notifications that allow you to subscribe to various system events. Events are consumed via HTTP streaming or WebSocket connections.
 
-### 1. Enable event streaming (if not already enabled in dev mode):
+### 1. Subscribe to events using curl (HTTP streaming):
 
-```bash
-vault write sys/events/subscribe/audit events="*"
-```
-
-### 2. Subscribe to events using WebSocket:
-
-You can subscribe to events using the WebSocket endpoint. From a separate terminal:
-
-```bash
-# Using websocat (install with: cargo install websocat or brew install websocat)
-websocat "ws://localhost:8200/v1/sys/events/subscribe/audit?json=true" -H="X-Vault-Token: root"
-```
-
-Or using curl with --no-buffer for streaming:
+From a terminal, use curl with --no-buffer for streaming:
 
 ```bash
 curl --no-buffer \
   --header "X-Vault-Token: root" \
   --request GET \
   http://localhost:8200/v1/sys/events/subscribe/audit?json=true
+```
+
+This will open a long-lived HTTP connection that streams events as they occur.
+
+### 2. Alternative: Subscribe using WebSocket:
+
+You can also subscribe using the WebSocket protocol:
+
+```bash
+# Using websocat (install with: cargo install websocat or brew install websocat)
+websocat "ws://localhost:8200/v1/sys/events/subscribe/audit?json=true" -H="X-Vault-Token: root"
 ```
 
 ### 3. Generate events to observe:
