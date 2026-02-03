@@ -1,0 +1,5 @@
+# Environment variables (contains license key)
+.env
+
+# Docker volumes and data
+docker-compose.override.yml

@@ -1,13 +1,30 @@
 # play-vault-events
 
-This repository is for testing HashiCorp Vault event notifications using Docker.
+This repository is for testing HashiCorp Vault Enterprise event notifications using Docker.
 
-**Note**: Event notifications are available in Vault v1.21+ (both OSS and Enterprise editions). This setup uses the standard Vault image which includes event notification capabilities.
+**Note**: Event notifications are an **Enterprise feature** available in Vault v1.21+. You will need a valid Vault Enterprise license to use this feature.
 
 ## Prerequisites
 
 - Docker and Docker Compose installed on your system
 - Basic knowledge of HashiCorp Vault
+- A valid Vault Enterprise license
+
+## Setup
+
+Before running Vault, you need to set your Vault Enterprise license as an environment variable:
+
+```bash
+export VAULT_LICENSE="your-license-key-here"
+```
+
+Alternatively, create a `.env` file in the repository root with your license:
+
+```
+VAULT_LICENSE=your-license-key-here
+```
+
+Docker Compose will automatically load the `.env` file.
 
 ## Running Vault with Docker Compose
 
