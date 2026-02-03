@@ -1,6 +1,6 @@
 services:
   vault:
-    image: hashicorp/vault:1.21
+    image: hashicorp/vault-enterprise:1.21-ent
     container_name: vault
     ports:
       - "8200:8200"

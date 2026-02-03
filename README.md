@@ -85,11 +85,11 @@ Vault provides event notifications that allow you to subscribe to various system
 From a terminal, use curl with --no-buffer for streaming:
 
 ```bash
-# Subscribe to KV v2 data write events
+# Subscribe to all KV v2 data events
 curl --no-buffer \
   --header "X-Vault-Token: root" \
   --request GET \
-  http://localhost:8200/v1/sys/events/subscribe/kv-v2/data-write?json=true
+  http://localhost:8200/v1/sys/events/subscribe/kv-v2/data-*?json=true
 ```
 
 This will open a long-lived HTTP connection that streams events as they occur.
@@ -100,7 +100,7 @@ You can also subscribe using the WebSocket protocol:
 
 ```bash
 # Using websocat (install with: cargo install websocat or brew install websocat)
-websocat "ws://localhost:8200/v1/sys/events/subscribe/kv-v2/data-write?json=true" -H="X-Vault-Token: root"
+websocat "ws://localhost:8200/v1/sys/events/subscribe/kv-v2/data-*?json=true" -H="X-Vault-Token: root"
 ```
 
 ### 3. Generate events to observe:
@@ -130,24 +130,7 @@ vault policy list
 
 ### Event Types
 
-Vault event types are organized by namespace. Common event types include:
-- `kv-v2/data-write` - KV v2 secret write operations
-- `kv-v2/data-read` - KV v2 secret read operations
-- `kv-v2/data-delete` - KV v2 secret delete operations
-
 For a complete list of event types, refer to the [Vault Events Documentation](https://developer.hashicorp.com/vault/docs/concepts/events).
-
-### Advanced Event Subscription
-
-Subscribe to multiple event types or use wildcards:
-
-```bash
-# Subscribe to all KV v2 events
-curl --no-buffer \
-  --header "X-Vault-Token: root" \
-  --request GET \
-  "http://localhost:8200/v1/sys/events/subscribe/kv-v2/*?json=true"
-```
 
 ## Stopping the Container
 
