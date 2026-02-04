@@ -131,6 +131,135 @@ vault kv delete secret/hello
 
 For a complete list of event types, refer to the [Vault Events Documentation](https://developer.hashicorp.com/vault/docs/concepts/events).
 
+## Generating Traffic with vault-benchmark
+
+[vault-benchmark](https://github.com/hashicorp/vault-benchmark) is a performance testing tool that can simulate realistic traffic to Vault. This is especially useful for generating a continuous stream of events to visualize in real-time using the event subscriptions or the Godot client.
+
+### Installing vault-benchmark
+
+#### Option 1: Download Release Binary
+
+Download the latest release from [HashiCorp releases](https://releases.hashicorp.com/vault-benchmark):
+
+```bash
+# Example for Linux AMD64 (adjust for your platform)
+wget https://releases.hashicorp.com/vault-benchmark/<VERSION>/vault-benchmark_<VERSION>_linux_amd64.zip
+unzip vault-benchmark_<VERSION>_linux_amd64.zip
+chmod +x vault-benchmark
+sudo mv vault-benchmark /usr/local/bin/
+```
+
+#### Option 2: Build from Source
+
+If you have Go installed:
+
+```bash
+git clone https://github.com/hashicorp/vault-benchmark.git
+cd vault-benchmark
+make bin
+# Binary will be in dist/<OS>/<ARCH>/vault-benchmark
+```
+
+### Using kvv2_write_test Benchmark
+
+The `kvv2_write_test` benchmark continuously writes to KV v2 secrets, which generates `kv-v2/data-write` events that you can observe through event subscriptions.
+
+#### 1. Create a Benchmark Configuration File
+
+A sample configuration file `vault-benchmark-config.hcl` is provided in this repository:
+
+```hcl
+# Vault connection settings
+vault_addr = "http://localhost:8200"
+vault_token = "root"
+
+# Benchmark duration (how long to generate traffic)
+duration = "60s"
+
+# Cleanup resources after benchmark completes
+cleanup = true
+
+# Random mount names to avoid conflicts
+random_mounts = true
+
+# KV v2 write test - generates continuous write traffic
+test "kvv2_write" "kvv2_write_test" {
+  weight = 100
+  config {
+    # Number of different keys to write to
+    numkvs = 100
+    
+    # Size of each key/value in bytes
+    kvsize = 100
+  }
+}
+```
+
+#### 2. Run the Benchmark
+
+```bash
+vault-benchmark run -config=vault-benchmark-config.hcl
+```
+
+You should see output similar to:
+
+```
+2024-02-04T12:00:00.000-0000 [INFO]  vault-benchmark: setting up targets
+2024-02-04T12:00:02.000-0000 [INFO]  vault-benchmark: starting benchmarks: duration=60s
+2024-02-04T12:01:02.000-0000 [INFO]  vault-benchmark: cleaning up targets
+2024-02-04T12:01:05.000-0000 [INFO]  vault-benchmark: benchmark complete
+
+Target: http://localhost:8200
+op                count   rate        throughput  mean      95th%     99th%     successRatio
+kvv2_write_test   30234   503.906667  503.750000  1.98ms    3.12ms    4.56ms    100.00%
+```
+
+#### Configuration Options
+
+You can customize the benchmark behavior:
+
+- **duration**: How long to run the test (e.g., `"30s"`, `"5m"`, `"1h"`)
+- **numkvs**: Number of unique keys to write (more keys = more varied paths)
+- **kvsize**: Size of the data written to each secret (in bytes)
+- **weight**: If running multiple test types, determines the percentage split (100 = 100%)
+
+#### Advanced: Multiple Test Types
+
+You can run multiple test types simultaneously:
+
+```hcl
+vault_addr = "http://localhost:8200"
+vault_token = "root"
+duration = "60s"
+cleanup = true
+random_mounts = true
+
+# 70% of traffic will be writes
+test "kvv2_write" "kvv2_write_test" {
+  weight = 70
+  config {
+    numkvs = 100
+    kvsize = 100
+  }
+}
+
+# 30% of traffic will be reads
+test "kvv2_read" "kvv2_read_test" {
+  weight = 30
+  config {
+    numkvs = 100
+  }
+}
+```
+
+### Tips for Best Results
+
+- Start event monitoring **before** running vault-benchmark to catch all events
+- Use the Godot client for a visual representation of the event stream
+- Adjust `duration` based on how long you want to observe events
+- Higher `numkvs` values create more diverse event data
+- The `cleanup = true` setting removes test data after completion
+
 ## Godot WebSocket Client
 
 This repository includes a Godot Engine project (`godot/`) that demonstrates consuming Vault enterprise events through a WebSocket connection in real-time.
