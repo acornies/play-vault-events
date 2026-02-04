@@ -136,16 +136,6 @@ For a complete list of event types, refer to the [Vault Events Documentation](ht
 
 [vault-benchmark](https://github.com/hashicorp/vault-benchmark) is a performance testing tool that can simulate realistic traffic to Vault. This is especially useful for generating a continuous stream of events to visualize in real-time using the event subscriptions or the Godot client.
 
-### What is vault-benchmark?
-
-`vault-benchmark` is an official HashiCorp tool designed to test the performance of Vault auth methods and secret engines. It uses the [Vegeta](https://github.com/tsenart/vegeta) HTTP load testing utility to generate sustained load against a Vault cluster.
-
-For this repository, vault-benchmark is particularly useful for:
-- **Simulating production-like traffic** to Vault while monitoring events
-- **Generating continuous KV v2 write operations** that produce events
-- **Testing event streaming** under load
-- **Demonstrating event visualization** with the Godot client
-
 ### Installing vault-benchmark
 
 #### Option 1: Download Release Binary
@@ -177,7 +167,7 @@ The `kvv2_write_test` benchmark continuously writes to KV v2 secrets, which gene
 
 #### 1. Create a Benchmark Configuration File
 
-Create a file named `vault-benchmark-config.hcl` with the following content:
+A sample configuration file `vault-benchmark-config.hcl` is provided in this repository:
 
 ```hcl
 # Vault connection settings
@@ -206,23 +196,7 @@ test "kvv2_write" "kvv2_write_test" {
 }
 ```
 
-#### 2. Set Up Event Monitoring
-
-Before running the benchmark, start monitoring events in one terminal:
-
-```bash
-# Subscribe to KV v2 data events
-curl --no-buffer \
-  --header "X-Vault-Token: root" \
-  --request GET \
-  http://localhost:8200/v1/sys/events/subscribe/kv-v2/data-*?json=true
-```
-
-Or use the Godot WebSocket client to visualize events in real-time (see [Godot WebSocket Client](#godot-websocket-client) section).
-
-#### 3. Run the Benchmark
-
-In another terminal, run vault-benchmark:
+#### 2. Run the Benchmark
 
 ```bash
 vault-benchmark run -config=vault-benchmark-config.hcl
@@ -239,30 +213,6 @@ You should see output similar to:
 Target: http://localhost:8200
 op                count   rate        throughput  mean      95th%     99th%     successRatio
 kvv2_write_test   30234   503.906667  503.750000  1.98ms    3.12ms    4.56ms    100.00%
-```
-
-#### 4. Observe the Events
-
-As vault-benchmark writes secrets, you'll see events streaming in your monitoring terminal. Each write operation generates an event that looks like:
-
-```json
-{
-  "id": "...",
-  "source": "http://localhost:8200/v1/sys/events/dispatch/kv-v2/data-write",
-  "specversion": "1.0",
-  "type": "kv-v2/data-write",
-  "data": {
-    "event": {
-      "id": "...",
-      "metadata": {
-        "modified": true,
-        "path": "secret/data/...",
-        ...
-      }
-    }
-  },
-  "time": "..."
-}
 ```
 
 #### Configuration Options
