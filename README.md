@@ -80,7 +80,16 @@ export VAULT_TOKEN='root'
 
 Vault provides event notifications that allow you to subscribe to various system events. Events are consumed via HTTP streaming or WebSocket connections.
 
-### 1. Subscribe to events using curl (HTTP streaming):
+### 1. Subscribe to events using Vault CLI:
+
+The simplest way to subscribe to events is using the Vault CLI:
+
+```bash
+# Subscribe to all KV v2 data events
+vault events subscribe kv-v2/data-*
+```
+
+### 2. Subscribe to events using curl (HTTP streaming):
 
 From a terminal, use curl with --no-buffer for streaming:
 
@@ -94,7 +103,7 @@ curl --no-buffer \
 
 This will open a long-lived HTTP connection that streams events as they occur.
 
-### 2. Alternative: Subscribe using WebSocket:
+### 3. Alternative: Subscribe using WebSocket:
 
 You can also subscribe using the WebSocket protocol:
 
@@ -103,7 +112,7 @@ You can also subscribe using the WebSocket protocol:
 websocat "ws://localhost:8200/v1/sys/events/subscribe/kv-v2/data-*?json=true" -H="X-Vault-Token: root"
 ```
 
-### 3. Generate events to observe:
+### 4. Generate events to observe:
 
 In another terminal, perform some Vault operations to generate events:
 
@@ -116,16 +125,6 @@ vault kv get secret/hello
 
 # Delete a secret
 vault kv delete secret/hello
-
-# Create a policy
-vault policy write my-policy - <<EOF
-path "secret/data/*" {
-  capabilities = ["create", "update"]
-}
-EOF
-
-# List policies
-vault policy list
 ```
 
 ### Event Types
