@@ -143,7 +143,7 @@ Download the latest release from [HashiCorp releases](https://releases.hashicorp
 
 ```bash
 # Example for Linux AMD64 (adjust for your platform)
-wget https://releases.hashicorp.com/vault-benchmark/<VERSION>/vault-benchmark_<VERSION>_linux_amd64.zip
+curl -O https://releases.hashicorp.com/vault-benchmark/<VERSION>/vault-benchmark_<VERSION>_linux_amd64.zip
 unzip vault-benchmark_<VERSION>_linux_amd64.zip
 chmod +x vault-benchmark
 sudo mv vault-benchmark /usr/local/bin/
@@ -164,38 +164,7 @@ make bin
 
 The `kvv2_write_test` benchmark continuously writes to KV v2 secrets, which generates `kv-v2/data-write` events that you can observe through event subscriptions.
 
-#### 1. Create a Benchmark Configuration File
-
-A sample configuration file `vault-benchmark-config.hcl` is provided in this repository:
-
-```hcl
-# Vault connection settings
-vault_addr = "http://localhost:8200"
-vault_token = "root"
-
-# Benchmark duration (how long to generate traffic)
-duration = "60s"
-
-# Cleanup resources after benchmark completes
-cleanup = true
-
-# Random mount names to avoid conflicts
-random_mounts = true
-
-# KV v2 write test - generates continuous write traffic
-test "kvv2_write" "kvv2_write_test" {
-  weight = 100
-  config {
-    # Number of different keys to write to
-    numkvs = 100
-    
-    # Size of each key/value in bytes
-    kvsize = 100
-  }
-}
-```
-
-#### 2. Run the Benchmark
+#### 1. Run the Benchmark
 
 ```bash
 vault-benchmark run -config=vault-benchmark-config.hcl

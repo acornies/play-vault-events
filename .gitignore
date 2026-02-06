@@ -3,3 +3,4 @@
 
 # Docker volumes and data
 docker-compose.override.yml
+.LICENSE.txt
