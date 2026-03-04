@@ -146,6 +146,13 @@ go build -o vault-simulate .
 
 ### Usage
 
+Before running the simulator, set the required environment variables:
+
+```bash
+export VAULT_ADDR='http://localhost:8200'
+export VAULT_TOKEN='root'
+```
+
 Run the simulator with the following options:
 
 ```bash
@@ -158,8 +165,20 @@ Run the simulator with the following options:
 |------|-------------|---------|
 | `-duration` | Duration to run the simulation (e.g., `30s`, `5m`, `1h`) | `60s` |
 | `-num-requests` | Number of requests to make during the duration | `100` |
-| `-vault-addr` | Vault server address | `http://localhost:8200` |
-| `-vault-token` | Vault token for authentication | `root` |
+
+#### Environment Variables
+
+The Vault SDK automatically reads standard Vault environment variables:
+
+| Variable | Description |
+|----------|-------------|
+| `VAULT_ADDR` | Vault server address (e.g., `http://localhost:8200`) |
+| `VAULT_TOKEN` | Vault authentication token |
+| `VAULT_CACERT` | Path to a CA certificate file (optional) |
+| `VAULT_CLIENT_CERT` | Path to a client certificate file (optional) |
+| `VAULT_CLIENT_KEY` | Path to a client key file (optional) |
+
+See the [Vault SDK documentation](https://pkg.go.dev/github.com/hashicorp/vault/api#DefaultConfig) for a full list of supported environment variables.
 
 #### Example Output
 

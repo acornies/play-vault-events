@@ -23,8 +23,6 @@ func main() {
 	// CLI flags
 	duration := flag.Duration("duration", 60*time.Second, "Duration to run the simulation (e.g., 30s, 5m, 1h)")
 	numRequests := flag.Int("num-requests", 100, "Number of requests to make during the duration")
-	vaultAddr := flag.String("vault-addr", "http://localhost:8200", "Vault server address")
-	vaultToken := flag.String("vault-token", "root", "Vault token for authentication")
 
 	flag.Parse()
 
@@ -36,16 +34,19 @@ func main() {
 		log.Fatal("duration must be greater than 0")
 	}
 
-	// Create Vault client configuration
+	// Create Vault client configuration using SDK defaults
+	// The SDK automatically reads VAULT_ADDR, VAULT_TOKEN and other standard env vars
 	config := api.DefaultConfig()
-	config.Address = *vaultAddr
 
 	client, err := api.NewClient(config)
 	if err != nil {
 		log.Fatalf("Failed to create Vault client: %v", err)
 	}
 
-	client.SetToken(*vaultToken)
+	// Validate that required environment variables are set
+	if client.Token() == "" {
+		log.Fatal("VAULT_TOKEN environment variable is required")
+	}
 
 	// Setup context with cancellation for graceful shutdown
 	ctx, cancel := context.WithTimeout(context.Background(), *duration)
@@ -60,8 +61,8 @@ func main() {
 		cancel()
 	}()
 
-	log.Printf("Starting vault-simulate: duration=%s, num-requests=%d, vault-addr=%s",
-		*duration, *numRequests, *vaultAddr)
+	log.Printf("Starting vault-simulate: duration=%s, num-requests=%d, vault-addr=%s (from VAULT_ADDR)",
+		*duration, *numRequests, config.Address)
 
 	// Run the simulation
 	if err := simulate(ctx, client, *duration, *numRequests); err != nil {
