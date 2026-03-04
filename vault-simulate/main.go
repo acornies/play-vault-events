@@ -5,7 +5,7 @@ import (
 	"flag"
 	"fmt"
 	"log"
-	"math/rand"
+	"math/rand/v2" // Using math/rand/v2 for non-cryptographic random intervals
 	"os"
 	"os/signal"
 	"syscall"
@@ -114,7 +114,7 @@ func generateRandomIntervals(totalDuration time.Duration, numRequests int) []tim
 	for i := 0; i < numRequests; i++ {
 		// Generate a random interval between min and max
 		intervalRange := maxInterval - minInterval
-		randomOffset := time.Duration(rand.Int63n(int64(intervalRange)))
+		randomOffset := time.Duration(rand.Int64N(int64(intervalRange)))
 		interval := minInterval + randomOffset
 
 		// Scale to fit within the total duration constraints
