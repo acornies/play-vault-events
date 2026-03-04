@@ -4,3 +4,6 @@
 # Docker volumes and data
 docker-compose.override.yml
 .LICENSE.txt
+
+# vault-simulate binary
+vault-simulate/vault-simulate
