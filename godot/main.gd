@@ -1,6 +1,10 @@
 extends Node
+signal vault_event
+
 @export var websocket_url = "ws://localhost:8200"
 @export var auth_token: String
+
+@onready var logo: Control = $Logo
 
 var socket = WebSocketPeer.new()
 
@@ -39,7 +43,21 @@ func _process(delta: float) -> void:
 			var packet = socket.get_packet()
 			if socket.was_string_packet():
 				var packet_text = packet.get_string_from_utf8()
-				print("< Got text data from server: %s" % packet_text)
+				var json = JSON.new()
+				var error = json.parse(packet_text)
+				if error == OK:
+					var data_received = json.data
+					#print(data_received)
+					if typeof(data_received) == TYPE_DICTIONARY:
+						vault_event.emit(data_received["data"])
+						logo.pulsate()
+						#Example data access
+						#print(data_received["data"]["event"]["metadata"]["operation"])
+						
+					else:
+						print("Unexpected format")
+				else:
+					print("JSON Parse Error: ", json.get_error_message(), " in ", packet_text, " at line ", json.get_error_line())
 			else:
 				print("< Got binary data from server: %d bytes" % packet.size())
 
