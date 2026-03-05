@@ -146,13 +146,6 @@ go build -o vault-simulate .
 
 ### Usage
 
-Before running the simulator, set the required environment variables:
-
-```bash
-export VAULT_ADDR='http://localhost:8200'
-export VAULT_TOKEN='root'
-```
-
 Run the simulator with the following options:
 
 ```bash
@@ -165,6 +158,8 @@ Run the simulator with the following options:
 |------|-------------|---------|
 | `-duration` | Duration to run the simulation (e.g., `30s`, `5m`, `1h`) | `60s` |
 | `-num-requests` | Number of requests to make during the duration | `100` |
+| `-min-interval` | Minimum interval between requests (e.g., `100ms`, `1s`) | `100ms` |
+| `-max-interval` | Maximum interval between requests (e.g., `1s`, `10s`) | `3s` |
 
 #### Environment Variables
 
@@ -193,7 +188,7 @@ See the [Vault SDK documentation](https://pkg.go.dev/github.com/hashicorp/vault/
 
 ### How It Works
 
-The simulator writes secrets to Vault's KV v2 secrets engine at the `secret/simulate/` path. Each request creates a unique key with a timestamp value. Requests are made at random intervals between 100 milliseconds and 3 seconds to simulate organic traffic patterns.
+The simulator writes secrets to Vault's KV v2 secrets engine at the `secret/simulate/` path. Each request creates a unique key with a timestamp value. Requests are made at random intervals between `-min-interval` and `-max-interval` (defaulting to 100 milliseconds and 3 seconds) to simulate organic traffic patterns.
 
 This generates `kv-v2/data-write` events that you can observe through event subscriptions.
 
@@ -201,7 +196,7 @@ This generates `kv-v2/data-write` events that you can observe through event subs
 
 - Start event monitoring **before** running vault-simulate to catch all events
 - Use the Godot client for a visual representation of the event stream
-- Adjust `-duration` and `-num-requests` based on how long you want to observe events
+- Adjust `-duration`, `-num-requests`, `-min-interval`, and `-max-interval` based on how long you want to observe events and at what rate
 - The tool can be stopped early with Ctrl+C for graceful shutdown
 
 ## Godot WebSocket Client
