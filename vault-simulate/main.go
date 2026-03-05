@@ -14,15 +14,12 @@ import (
 	"github.com/hashicorp/vault/api"
 )
 
-const (
-	minInterval = 100 * time.Millisecond
-	maxInterval = 3 * time.Second
-)
-
 func main() {
 	// CLI flags
 	duration := flag.Duration("duration", 60*time.Second, "Duration to run the simulation (e.g., 30s, 5m, 1h)")
 	numRequests := flag.Int("num-requests", 100, "Number of requests to make during the duration")
+	minInterval := flag.Duration("min-interval", 100*time.Millisecond, "Minimum interval between requests (e.g., 100ms, 1s)")
+	maxInterval := flag.Duration("max-interval", 3*time.Second, "Maximum interval between requests (e.g., 1s, 10s)")
 
 	flag.Parse()
 
@@ -32,6 +29,12 @@ func main() {
 	}
 	if *duration <= 0 {
 		log.Fatal("duration must be greater than 0")
+	}
+	if *minInterval <= 0 {
+		log.Fatal("min-interval must be greater than 0")
+	}
+	if *maxInterval <= *minInterval {
+		log.Fatal("max-interval must be greater than min-interval")
 	}
 
 	// Create Vault client configuration using SDK defaults
@@ -65,7 +68,7 @@ func main() {
 		*duration, *numRequests, config.Address)
 
 	// Run the simulation
-	if err := simulate(ctx, client, *duration, *numRequests); err != nil {
+	if err := simulate(ctx, client, *duration, *numRequests, *minInterval, *maxInterval); err != nil {
 		log.Fatalf("Simulation failed: %v", err)
 	}
 
@@ -73,8 +76,8 @@ func main() {
 }
 
 // simulate runs the traffic simulation against Vault
-func simulate(ctx context.Context, client *api.Client, duration time.Duration, numRequests int) error {
-	intervals := generateRandomIntervals(duration, numRequests)
+func simulate(ctx context.Context, client *api.Client, duration time.Duration, numRequests int, minInterval, maxInterval time.Duration) error {
+	intervals := generateRandomIntervals(duration, numRequests, minInterval, maxInterval)
 
 	requestCount := 0
 	successCount := 0
@@ -105,14 +108,14 @@ func simulate(ctx context.Context, client *api.Client, duration time.Duration, n
 
 // generateRandomIntervals creates random intervals between minInterval and maxInterval
 // that are distributed across the total duration
-func generateRandomIntervals(totalDuration time.Duration, numRequests int) []time.Duration {
+func generateRandomIntervals(totalDuration time.Duration, numRequests int, minInterval, maxInterval time.Duration) []time.Duration {
 	intervals := make([]time.Duration, numRequests)
 
 	// Calculate average interval needed
 	avgInterval := totalDuration / time.Duration(numRequests)
 
 	// Generate random intervals within bounds
-	for i := 0; i < numRequests; i++ {
+	for i := range numRequests {
 		// Generate a random interval between min and max
 		intervalRange := maxInterval - minInterval
 		randomOffset := time.Duration(rand.Int64N(int64(intervalRange)))
