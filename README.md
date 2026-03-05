@@ -131,103 +131,78 @@ vault kv delete secret/hello
 
 For a complete list of event types, refer to the [Vault Events Documentation](https://developer.hashicorp.com/vault/docs/concepts/events).
 
-## Generating Traffic with vault-benchmark
+## Generating Traffic with vault-simulate
 
-[vault-benchmark](https://github.com/hashicorp/vault-benchmark) is a performance testing tool that can simulate realistic traffic to Vault. This is especially useful for generating a continuous stream of events to visualize in real-time using the event subscriptions or the Godot client.
+The `vault-simulate` tool is a Go CLI application included in this repository that simulates organic traffic to a HashiCorp Vault server. It uses the official Vault Go SDK to make requests at random intervals, which is useful for generating events to visualize in real-time using event subscriptions or the Godot client.
 
-### Installing vault-benchmark
+### Building vault-simulate
 
-#### Option 1: Download Release Binary
-
-Download the latest release from [HashiCorp releases](https://releases.hashicorp.com/vault-benchmark):
+Navigate to the `vault-simulate` directory and build the binary:
 
 ```bash
-# Example for Linux AMD64 (adjust for your platform)
-curl -O https://releases.hashicorp.com/vault-benchmark/<VERSION>/vault-benchmark_<VERSION>_linux_amd64.zip
-unzip vault-benchmark_<VERSION>_linux_amd64.zip
-chmod +x vault-benchmark
-sudo mv vault-benchmark /usr/local/bin/
+cd vault-simulate
+go build -o vault-simulate .
 ```
 
-#### Option 2: Build from Source
+### Usage
 
-If you have Go installed:
+Before running the simulator, set the required environment variables:
 
 ```bash
-git clone https://github.com/hashicorp/vault-benchmark.git
-cd vault-benchmark
-make bin
-# Binary will be in dist/<OS>/<ARCH>/vault-benchmark
+export VAULT_ADDR='http://localhost:8200'
+export VAULT_TOKEN='root'
 ```
 
-### Using kvv2_write_test Benchmark
-
-The `kvv2_write_test` benchmark continuously writes to KV v2 secrets, which generates `kv-v2/data-write` events that you can observe through event subscriptions.
-
-#### 1. Run the Benchmark
+Run the simulator with the following options:
 
 ```bash
-vault-benchmark run -config=vault-benchmark-config.hcl
+./vault-simulate -duration=60s -num-requests=100
 ```
 
-You should see output similar to:
+#### CLI Flags
+
+| Flag | Description | Default |
+|------|-------------|---------|
+| `-duration` | Duration to run the simulation (e.g., `30s`, `5m`, `1h`) | `60s` |
+| `-num-requests` | Number of requests to make during the duration | `100` |
+
+#### Environment Variables
+
+The Vault SDK automatically reads standard Vault environment variables:
+
+| Variable | Description |
+|----------|-------------|
+| `VAULT_ADDR` | Vault server address (e.g., `http://localhost:8200`) |
+| `VAULT_TOKEN` | Vault authentication token |
+| `VAULT_CACERT` | Path to a CA certificate file (optional) |
+| `VAULT_CLIENT_CERT` | Path to a client certificate file (optional) |
+| `VAULT_CLIENT_KEY` | Path to a client key file (optional) |
+
+See the [Vault SDK documentation](https://pkg.go.dev/github.com/hashicorp/vault/api#DefaultConfig) for a full list of supported environment variables.
+
+#### Example Output
 
 ```
-2024-02-04T12:00:00.000-0000 [INFO]  vault-benchmark: setting up targets
-2024-02-04T12:00:02.000-0000 [INFO]  vault-benchmark: starting benchmarks: duration=60s
-2024-02-04T12:01:02.000-0000 [INFO]  vault-benchmark: cleaning up targets
-2024-02-04T12:01:05.000-0000 [INFO]  vault-benchmark: benchmark complete
-
-Target: http://localhost:8200
-op                count   rate        throughput  mean      95th%     99th%     successRatio
-kvv2_write_test   30234   503.906667  503.750000  1.98ms    3.12ms    4.56ms    100.00%
+2024/02/04 12:00:00 Starting vault-simulate: duration=1m0s, num-requests=100, vault-addr=http://localhost:8200
+2024/02/04 12:00:01 Request 1 completed successfully
+2024/02/04 12:00:03 Request 2 completed successfully
+...
+2024/02/04 12:01:00 Simulation finished: completed 100/100 requests (success: 100, errors: 0)
+2024/02/04 12:01:00 Simulation completed successfully
 ```
 
-#### Configuration Options
+### How It Works
 
-You can customize the benchmark behavior:
+The simulator writes secrets to Vault's KV v2 secrets engine at the `secret/simulate/` path. Each request creates a unique key with a timestamp value. Requests are made at random intervals between 100 milliseconds and 3 seconds to simulate organic traffic patterns.
 
-- **duration**: How long to run the test (e.g., `"30s"`, `"5m"`, `"1h"`)
-- **numkvs**: Number of unique keys to write (more keys = more varied paths)
-- **kvsize**: Size of the data written to each secret (in bytes)
-- **weight**: If running multiple test types, determines the percentage split (100 = 100%)
-
-#### Advanced: Multiple Test Types
-
-You can run multiple test types simultaneously:
-
-```hcl
-vault_addr = "http://localhost:8200"
-vault_token = "root"
-duration = "60s"
-cleanup = true
-random_mounts = true
-
-# 70% of traffic will be writes
-test "kvv2_write" "kvv2_write_test" {
-  weight = 70
-  config {
-    numkvs = 100
-    kvsize = 100
-  }
-}
-
-# 30% of traffic will be reads
-test "kvv2_read" "kvv2_read_test" {
-  weight = 30
-  config {
-    numkvs = 100
-  }
-}
-```
+This generates `kv-v2/data-write` events that you can observe through event subscriptions.
 
 ### Tips for Best Results
 
-- Start event monitoring **before** running vault-benchmark to catch all events
+- Start event monitoring **before** running vault-simulate to catch all events
 - Use the Godot client for a visual representation of the event stream
-- Adjust `duration` based on how long you want to observe events
-- Higher `numkvs` values create more diverse event data
-- The `cleanup = true` setting removes test data after completion
+- Adjust `-duration` and `-num-requests` based on how long you want to observe events
+- The tool can be stopped early with Ctrl+C for graceful shutdown
 
 ## Godot WebSocket Client
 
