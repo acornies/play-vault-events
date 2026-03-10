@@ -160,6 +160,7 @@ Run the simulator with the following options:
 | `-num-requests` | Number of requests to make during the duration | `100` |
 | `-min-interval` | Minimum interval between requests (e.g., `100ms`, `1s`) | `100ms` |
 | `-max-interval` | Maximum interval between requests (e.g., `1s`, `10s`) | `3s` |
+| `-request-types` | Comma-delimited list of request types to simulate (accepted: `kv`, `ldap`, `database`) | `kv` |
 
 #### Environment Variables
 
@@ -189,6 +190,10 @@ See the [Vault SDK documentation](https://pkg.go.dev/github.com/hashicorp/vault/
 ### How It Works
 
 The simulator writes secrets to Vault's KV v2 secrets engine at the `secret/simulate/` path. Each request creates a unique key with a timestamp value. Requests are made at random intervals between `-min-interval` and `-max-interval` (defaulting to 100 milliseconds and 3 seconds) to simulate organic traffic patterns.
+
+Use the `-request-types` flag to specify which secret engine types to simulate (e.g., `-request-types=kv,ldap,database`). The program will verify that the specified secret engines are mounted in Vault before starting, failing fast if any are missing. Currently, only the `kv` type is implemented; `ldap` and `database` are planned for future releases.
+
+At the end of the simulation, all KV keys created during the run are automatically cleaned up.
 
 This generates `kv-v2/data-write` events that you can observe through event subscriptions.
 
