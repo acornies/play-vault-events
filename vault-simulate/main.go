@@ -114,12 +114,12 @@ func simulate(ctx context.Context, client *api.Client, duration time.Duration, n
 	errorCount := 0
 	var createdKVKeys []string
 
-	stopped := false
+	stoppedEarly := false
 loop:
 	for i, interval := range intervals {
 		select {
 		case <-ctx.Done():
-			stopped = true
+			stoppedEarly = true
 			break loop
 		case <-time.After(interval):
 			requestCount++
@@ -135,7 +135,7 @@ loop:
 		}
 	}
 
-	if stopped {
+	if stoppedEarly {
 		log.Printf("Simulation stopped: completed %d/%d requests (success: %d, errors: %d)",
 			requestCount, numRequests, successCount, errorCount)
 	} else {
@@ -262,9 +262,14 @@ func checkUnimplemented(types []string) {
 // cleanupKVKeys deletes all KV keys created during the simulation.
 func cleanupKVKeys(client *api.Client, keys []string) {
 	log.Printf("Cleaning up %d KV keys...", len(keys))
+
+	// Use a separate timeout context for cleanup to avoid hanging indefinitely
+	cleanupCtx, cleanupCancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cleanupCancel()
+
 	cleanupErrors := 0
 	for _, key := range keys {
-		err := client.KVv2("secret").DeleteMetadata(context.Background(), key)
+		err := client.KVv2("secret").DeleteMetadata(cleanupCtx, key)
 		if err != nil {
 			cleanupErrors++
 			log.Printf("Failed to delete key %q: %v", key, err)
