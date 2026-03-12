@@ -94,3 +94,46 @@ func TestValidateRequestTypes(t *testing.T) {
 		})
 	}
 }
+
+func TestContainsType(t *testing.T) {
+	tests := []struct {
+		name     string
+		types    []string
+		target   string
+		expected bool
+	}{
+		{
+			name:     "found in list",
+			types:    []string{"kv", "ldap", "database"},
+			target:   "kv",
+			expected: true,
+		},
+		{
+			name:     "not found in list",
+			types:    []string{"kv", "ldap"},
+			target:   "database",
+			expected: false,
+		},
+		{
+			name:     "empty list",
+			types:    []string{},
+			target:   "kv",
+			expected: false,
+		},
+		{
+			name:     "single match",
+			types:    []string{"kv"},
+			target:   "kv",
+			expected: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := containsType(tt.types, tt.target)
+			if result != tt.expected {
+				t.Errorf("containsType(%v, %q) = %v, want %v", tt.types, tt.target, result, tt.expected)
+			}
+		})
+	}
+}
