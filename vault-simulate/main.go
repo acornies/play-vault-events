@@ -8,11 +8,26 @@ import (
 	"math/rand/v2" // Using math/rand/v2 for non-cryptographic random intervals
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
 	"github.com/hashicorp/vault/api"
 )
+
+// validRequestTypes defines the accepted request types for the simulation.
+var validRequestTypes = map[string]bool{
+	"kv":       true,
+	"ldap":     true,
+	"database": true,
+}
+
+// mountPaths maps request types to their expected Vault mount paths.
+// The "kv" type is excluded because its mount path is configurable via the -kv-path flag.
+var mountPaths = map[string]string{
+	"ldap":     "ldap/",
+	"database": "database/",
+}
 
 func main() {
 	// CLI flags
@@ -20,8 +35,16 @@ func main() {
 	numRequests := flag.Int("num-requests", 100, "Number of requests to make during the duration")
 	minInterval := flag.Duration("min-interval", 100*time.Millisecond, "Minimum interval between requests (e.g., 100ms, 1s)")
 	maxInterval := flag.Duration("max-interval", 3*time.Second, "Maximum interval between requests (e.g., 1s, 10s)")
+	requestTypes := flag.String("request-types", "kv", "Comma-delimited list of request types to simulate (accepted: kv, ldap, database)")
+	kvPath := flag.String("kv-path", "simulate-secret", "Vault KV v2 mount path used for the simulation")
 
 	flag.Parse()
+
+	// Parse and validate request types
+	types := parseRequestTypes(*requestTypes)
+	if err := validateRequestTypes(types); err != nil {
+		log.Fatal(err)
+	}
 
 	// Validate inputs
 	if *numRequests <= 0 {
@@ -51,6 +74,21 @@ func main() {
 		log.Fatal("VAULT_TOKEN environment variable is required")
 	}
 
+	// Fail fast: check that required secret engines (other than kv) are mounted/enabled in Vault
+	if err := checkMounts(client, types); err != nil {
+		log.Fatalf("Mount check failed: %v", err)
+	}
+
+	// Fail fast: check for unimplemented request types
+	checkUnimplemented(types)
+
+	// Enable KV v2 mount at kv-path if kv type is requested
+	if containsType(types, "kv") {
+		if err := enableKVMount(client, *kvPath); err != nil {
+			log.Fatalf("Failed to enable KV mount at %q: %v", *kvPath, err)
+		}
+	}
+
 	// Setup context with cancellation for graceful shutdown
 	ctx, cancel := context.WithTimeout(context.Background(), *duration)
 	defer cancel()
@@ -64,11 +102,11 @@ func main() {
 		cancel()
 	}()
 
-	log.Printf("Starting vault-simulate: duration=%s, num-requests=%d, vault-addr=%s (from VAULT_ADDR)",
-		*duration, *numRequests, config.Address)
+	log.Printf("Starting vault-simulate: duration=%s, num-requests=%d, request-types=%s, kv-path=%s, vault-addr=%s (from VAULT_ADDR)",
+		*duration, *numRequests, strings.Join(types, ","), *kvPath, config.Address)
 
 	// Run the simulation
-	if err := simulate(ctx, client, *duration, *numRequests, *minInterval, *maxInterval); err != nil {
+	if err := simulate(ctx, client, *duration, *numRequests, *minInterval, *maxInterval, types, *kvPath); err != nil {
 		log.Fatalf("Simulation failed: %v", err)
 	}
 
@@ -76,22 +114,23 @@ func main() {
 }
 
 // simulate runs the traffic simulation against Vault
-func simulate(ctx context.Context, client *api.Client, duration time.Duration, numRequests int, minInterval, maxInterval time.Duration) error {
+func simulate(ctx context.Context, client *api.Client, duration time.Duration, numRequests int, minInterval, maxInterval time.Duration, requestTypes []string, kvPath string) error {
 	intervals := generateRandomIntervals(duration, numRequests, minInterval, maxInterval)
 
 	requestCount := 0
 	successCount := 0
 	errorCount := 0
 
+	stoppedEarly := false
+loop:
 	for i, interval := range intervals {
 		select {
 		case <-ctx.Done():
-			log.Printf("Simulation stopped: completed %d/%d requests (success: %d, errors: %d)",
-				requestCount, numRequests, successCount, errorCount)
-			return nil
+			stoppedEarly = true
+			break loop
 		case <-time.After(interval):
 			requestCount++
-			if err := makeVaultRequest(client, i); err != nil {
+			if err := makeVaultRequest(client, i, kvPath); err != nil {
 				errorCount++
 				log.Printf("Request %d failed: %v", requestCount, err)
 			} else {
@@ -101,8 +140,19 @@ func simulate(ctx context.Context, client *api.Client, duration time.Duration, n
 		}
 	}
 
-	log.Printf("Simulation finished: completed %d/%d requests (success: %d, errors: %d)",
-		requestCount, numRequests, successCount, errorCount)
+	if stoppedEarly {
+		log.Printf("Simulation stopped: completed %d/%d requests (success: %d, errors: %d)",
+			requestCount, numRequests, successCount, errorCount)
+	} else {
+		log.Printf("Simulation finished: completed %d/%d requests (success: %d, errors: %d)",
+			requestCount, numRequests, successCount, errorCount)
+	}
+
+	// Clean up by disabling and re-enabling the KV mount
+	if containsType(requestTypes, "kv") {
+		cleanupKVMount(client, kvPath)
+	}
+
 	return nil
 }
 
@@ -138,7 +188,7 @@ func generateRandomIntervals(totalDuration time.Duration, numRequests int, minIn
 }
 
 // makeVaultRequest performs a simulated request to Vault
-func makeVaultRequest(client *api.Client, requestNum int) error {
+func makeVaultRequest(client *api.Client, requestNum int, kvPath string) error {
 	// Generate a unique key for this request
 	key := fmt.Sprintf("simulate/key-%d-%d", requestNum, time.Now().UnixNano())
 	secretData := map[string]interface{}{
@@ -147,10 +197,133 @@ func makeVaultRequest(client *api.Client, requestNum int) error {
 	}
 
 	// Write a secret to KV v2
-	_, err := client.KVv2("secret").Put(context.Background(), key, secretData)
+	_, err := client.KVv2(kvPath).Put(context.Background(), key, secretData)
 	if err != nil {
 		return fmt.Errorf("failed to write secret: %w", err)
 	}
 
 	return nil
+}
+
+// parseRequestTypes splits a comma-delimited string into a slice of trimmed, lowercased request types.
+func parseRequestTypes(input string) []string {
+	parts := strings.Split(input, ",")
+	types := make([]string, 0, len(parts))
+	for _, p := range parts {
+		t := strings.TrimSpace(strings.ToLower(p))
+		if t != "" {
+			types = append(types, t)
+		}
+	}
+	return types
+}
+
+// validateRequestTypes checks that all specified request types are recognized.
+func validateRequestTypes(types []string) error {
+	if len(types) == 0 {
+		return fmt.Errorf("at least one request type must be specified")
+	}
+	for _, t := range types {
+		if !validRequestTypes[t] {
+			return fmt.Errorf("invalid request type %q: accepted types are kv, ldap, database", t)
+		}
+	}
+	return nil
+}
+
+// checkMounts verifies that the required secret engines are mounted/enabled in Vault.
+// The "kv" type is excluded because its mount is managed by the -kv-path flag.
+func checkMounts(client *api.Client, types []string) error {
+	mounts, err := client.Sys().ListMounts()
+	if err != nil {
+		return fmt.Errorf("failed to list mounts: %w", err)
+	}
+
+	for _, t := range types {
+		expectedPath, ok := mountPaths[t]
+		if !ok {
+			continue
+		}
+		if _, mounted := mounts[expectedPath]; !mounted {
+			return fmt.Errorf("secret engine %q is not mounted at %q - please enable it before running the simulation", t, expectedPath)
+		}
+	}
+	return nil
+}
+
+// checkUnimplemented fails fast if any of the specified request types are not yet implemented.
+func checkUnimplemented(types []string) {
+	for _, t := range types {
+		switch t {
+		case "ldap":
+			// TODO: Implement LDAP secret engine simulation
+			log.Fatalf("request type %q is not yet implemented", t)
+		case "database":
+			// TODO: Implement database secret engine simulation
+			log.Fatalf("request type %q is not yet implemented", t)
+		}
+	}
+}
+
+// containsType checks if a slice of request types contains a specific type.
+func containsType(types []string, target string) bool {
+	for _, t := range types {
+		if t == target {
+			return true
+		}
+	}
+	return false
+}
+
+// enableKVMount enables a KV v2 secrets engine at the specified path.
+// If the mount already exists, it is left as-is.
+func enableKVMount(client *api.Client, kvPath string) error {
+	mounts, err := client.Sys().ListMounts()
+	if err != nil {
+		return fmt.Errorf("failed to list mounts: %w", err)
+	}
+
+	mountKey := kvPath + "/"
+	if _, exists := mounts[mountKey]; exists {
+		log.Printf("KV v2 secrets engine already mounted at %q", kvPath)
+		return nil
+	}
+
+	mountInput := &api.MountInput{
+		Type:    "kv",
+		Options: map[string]string{"version": "2"},
+	}
+	if err := client.Sys().Mount(kvPath, mountInput); err != nil {
+		return fmt.Errorf("failed to enable KV v2 at %q: %w", kvPath, err)
+	}
+	log.Printf("Enabled KV v2 secrets engine at %q", kvPath)
+	return nil
+}
+
+// cleanupKVMount cleans up the KV mount by disabling and re-enabling it.
+// This effectively removes all secrets without deleting them individually.
+func cleanupKVMount(client *api.Client, kvPath string) {
+	log.Printf("Cleaning up KV mount at %q...", kvPath)
+
+	// Use a separate timeout context for cleanup to avoid hanging indefinitely
+	cleanupCtx, cleanupCancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cleanupCancel()
+
+	// Disable the mount (removes all data)
+	if err := client.Sys().UnmountWithContext(cleanupCtx, kvPath); err != nil {
+		log.Printf("Failed to disable KV mount at %q: %v", kvPath, err)
+		return
+	}
+
+	// Re-enable the mount
+	mountInput := &api.MountInput{
+		Type:    "kv",
+		Options: map[string]string{"version": "2"},
+	}
+	if err := client.Sys().MountWithContext(cleanupCtx, kvPath, mountInput); err != nil {
+		log.Printf("Failed to re-enable KV mount at %q: %v", kvPath, err)
+		return
+	}
+
+	log.Printf("Successfully cleaned up KV mount at %q", kvPath)
 }
